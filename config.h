@@ -8,21 +8,6 @@
 
 class Config {
     private:
-        /*
-         * Also: Custom config db, custom out file/stdout, verbose, reset, disable whitelist/blacklist/redirect
-         */
-        static const std::string ARG_ALLOW_REDIR;
-        static const std::string ARG_REDIR_IP;
-        static const std::string ARG_HELP;
-        static const std::string ARG_RESET;
-        static const std::string ARG_OUT_FILE;
-        static const std::string ARG_WHITELIST;
-        static const std::string ARG_BLACKLIST;
-        static const std::string ARG_REDIRECT;
-        static const std::string ARG_HOSTS_SRC;
-        static const std::string ARG_REMOVE;
-        static const std::string ARG_ADD;
-
         static const std::string DEFAULT_IP;
 
         static const std::string HOSTS_TABLE;
@@ -39,33 +24,21 @@ class Config {
 
         std::string m_redirectIP{DEFAULT_IP};
 
-        std::string m_outFile;
+        std::string m_outFile{""};
 
-        bool m_isHelp{false};
-        bool m_resetDB{false};
         bool m_configOnly{false};
         bool m_removing{false};
 
-        void parseArgs(int argc, char **argv);
-        void prepareDB(SQLite::DB &db);
     public:
         Config(const std::string &file);
         ~Config();
-        void configure(int argc, char **argv);
+        void prepare();
+        void configure();
         const std::vector<std::string>& getHostUrls();
-        static const std::string& getHelpFlag();
-        static const std::string& getRedirectIPFlag();
-        static const std::string& getAllowRedirectFlag();
-        static const std::string& getOutFileFlag();
-        static const std::string& getResetDBFlag();
-        static const std::string& getBlacklistFlag();
-        static const std::string& getWhitelistFlag();
-        static const std::string& getRedirectionFlag();
 
         const std::string& getRedirectIP() const;
-        bool wantsHelp() const;
-        bool wantsResetDB() const;
         const std::string& outFile() const;
+        void outFile(const std::string &file);
         void resetDB();
 
         void insertEntry(const std::string &host, const std::string &line);
@@ -78,6 +51,10 @@ class Config {
         void rmWhitelist(const std::string &domain);
         void rmRedirect(const std::string &domain);
         void rmHostsSrc(const std::string &domain);
+
+        void allowHostsRedirection(bool set);
+        bool allowHostsRedirection() const;
+        void setRedirectIP(const std::string &ip);
 
         static const std::regex ipRegex;
         static const std::regex domainRegex;

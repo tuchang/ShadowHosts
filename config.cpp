@@ -16,18 +16,6 @@ const std::regex Config::urlRegex{"https:\\/\\/((\\w|-)+)?(\\.(\\w|-)+)*"
                             "=(\\w|_|-|.|~|(%(2[1346789ABCF]|3[ABDF]|40|5[BD])))))*)?",
                             std::regex::ECMAScript | std::regex::optimize};
 
-const std::string Config::ARG_ALLOW_REDIR{"--allow-redirection"};
-const std::string Config::ARG_REDIR_IP{"--redirect-ip"};
-const std::string Config::ARG_OUT_FILE{"--out"};
-const std::string Config::ARG_HELP{"--help"};
-const std::string Config::ARG_RESET{"--reset"};
-const std::string Config::ARG_WHITELIST{"--whitelist"};
-const std::string Config::ARG_BLACKLIST{"--blacklist"};
-const std::string Config::ARG_REDIRECT{"--redirect"};
-const std::string Config::ARG_HOSTS_SRC{"--hosts-src"};
-const std::string Config::ARG_ADD{"--add"};
-const std::string Config::ARG_REMOVE{"--remove"};
-
 const std::string Config::DEFAULT_IP{"127.0.0.1"};
 
 const std::string Config::HOSTS_TABLE{"hosts"};
@@ -45,7 +33,7 @@ Config::Config(const std::string &file): m_db{file} {
 
 Config::~Config() { m_db.close(); }
 
-void Config::prepareDB(SQLite::DB &db) {
+void Config::prepare() {
     std::string statement{"CREATE TABLE IF NOT EXISTS " + CONFIG_TABLE + "("
                             "option_name TEXT NOT NULL PRIMARY KEY UNIQUE, "
                             "value TEXT NOT NULL"
@@ -91,109 +79,7 @@ void Config::prepareDB(SQLite::DB &db) {
     if (count == 0) resetDB();
 }
 
-void Config::parseArgs(int argc, char *argv[]) {
-    if (argc > 1) {
-        std::string arg;
-        for (int i = 1; i < argc; ++i) {
-            arg = argv[i];
-            if (arg == ARG_ALLOW_REDIR)
-                m_allowRedirectionInHosts = true;
-            else if(arg == ARG_REDIR_IP) {
-                if (i+1 < argc) {
-                    arg = argv[++i];
-                    if (std::regex_match(arg, Config::ipRegex))
-                        m_redirectIP = arg;
-                    else
-                        throw std::invalid_argument(arg + " is not a valid IP address!");
-                }
-                else throw std::invalid_argument("Missing argument [IP_ADDRESS] to flag " + ARG_REDIR_IP);
-            }
-            else if (arg == ARG_RESET) {
-                m_resetDB = true;
-            }
-            else if (arg == ARG_REMOVE) {
-                m_removing = true;
-            }
-            else if (arg == ARG_ADD) {
-                m_removing = false;
-            }
-            else if (arg == ARG_BLACKLIST) {
-                if (i+1 < argc) {
-                    arg = argv[++i];
-                    if (m_removing) {
-                        rmBlacklist(arg);
-                    }
-                    else {
-                        blacklist(arg);
-                    }
-                }
-                else throw std::invalid_argument("Missing argument [DOMAIN] to flag " + ARG_BLACKLIST);
-            }
-            else if (arg == ARG_WHITELIST) {
-                if (i+1 < argc) {
-                    arg = argv[++i];
-                    if (m_removing) {
-                        rmWhitelist(arg);
-                    }
-                    else {
-                        whitelist(arg);
-                    }
-                }
-                else throw std::invalid_argument("Missing argument [DOMAIN] to flag " + ARG_WHITELIST);
-            }
-            else if (arg == ARG_REDIRECT) {
-                if (m_removing) {
-                    if (i+1 < argc) {
-                        arg = argv[++i];
-                        rmRedirect(arg);
-                    }
-                    else throw std::invalid_argument("Missing argument [DOMAIN] to flags " + ARG_REMOVE + " " + ARG_REDIRECT);
-                }
-                else {
-                    if (i+2 < argc) {
-                        std::string domain, ip;
-                        domain = argv[++i];
-                        ip = argv[++i];
-                        redirect(domain, ip);
-                    }
-                    else throw std::invalid_argument("Missing arguments [DOMAIN] [IP_ADDRESS] to flag " + ARG_REDIRECT);
-                }
-            }
-            else if (arg == ARG_HOSTS_SRC) {
-                if (i+1 < argc) {
-                    arg = argv[++i];
-                    if (m_removing) {
-                        rmHostsSrc(arg);
-                    }
-                    else {
-                        addHostsSrc(arg);
-                    }
-                }
-                else throw std::invalid_argument("Missing argument [URL] to flag " + ARG_HOSTS_SRC);
-            }
-            else if (arg == ARG_OUT_FILE) {
-                if (i+1 < argc) {
-                    arg = argv[++i];
-                    m_outFile = arg;
-                    // TODO: Check if valid file, can write, etc?
-                }
-                else throw std::invalid_argument("Missing argument [FILE] to flag " + ARG_OUT_FILE);
-            }
-            else if (arg == ARG_HELP) {
-                m_isHelp = true;
-                break;
-            }
-        }
-    }
-}
-
-
-void Config::configure(int argc, char **argv) {
-    prepareDB(m_db);
-    parseArgs(argc, argv);
-    if (wantsResetDB()) {
-        resetDB();
-    }
+void Config::configure() {
     SQLite::Stmt urls = m_db.prepare("SELECT url FROM " + HOSTS_TABLE + " WHERE enabled = 1");
     std::string url;
     urls.exec([this, &url](SQLite::Row &row) mutable -> void {
@@ -205,18 +91,7 @@ void Config::configure(int argc, char **argv) {
 
 const std::vector<std::string>& Config::getHostUrls() { return m_hostURLs; }
 
-const std::string& Config::getHelpFlag() { return ARG_HELP; }
-const std::string& Config::getRedirectIPFlag() { return ARG_REDIR_IP; }
-const std::string& Config::getAllowRedirectFlag() { return ARG_ALLOW_REDIR; }
-const std::string& Config::getOutFileFlag() { return ARG_OUT_FILE; }
-const std::string& Config::getResetDBFlag() { return ARG_RESET; }
-const std::string& Config::getBlacklistFlag() { return ARG_BLACKLIST; }
-const std::string& Config::getWhitelistFlag() { return ARG_WHITELIST; }
-const std::string& Config::getRedirectionFlag() { return ARG_REDIRECT; }
-
 const std::string& Config::getRedirectIP() const { return m_redirectIP; }
-bool Config::wantsHelp() const { return m_isHelp; }
-bool Config::wantsResetDB() const { return m_resetDB; }
 const std::string& Config::outFile() const { return m_outFile; }
 
 void Config::saveToFile() {
@@ -286,6 +161,20 @@ void Config::resetDB() {
     host = "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext";
     insert.bindValue(":url", host);
     insert.exec();
+}
+
+void Config::allowHostsRedirection(bool set) { m_allowRedirectionInHosts = set; }
+
+bool Config::allowHostsRedirection() const { return m_allowRedirectionInHosts; }
+
+void Config::setRedirectIP(const std::string &ip) {
+    if (std::regex_match(ip, ipRegex)) {
+        m_redirectIP = ip;
+    }
+}
+
+void Config::outFile(const std::string &file) {
+    m_outFile = file;
 }
 
 void Config::blacklist(const std::string &domain) {
