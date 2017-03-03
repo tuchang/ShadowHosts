@@ -11,11 +11,17 @@ class Config {
         /*
          * Also: Custom config db, custom out file/stdout, verbose, reset, disable whitelist/blacklist/redirect
          */
-        static const std::string allowRedirectArg;
-        static const std::string redirectIPArg;
-        static const std::string helpArg;
-        static const std::string resetArg;
-        static const std::string outFileArg;
+        static const std::string ARG_ALLOW_REDIR;
+        static const std::string ARG_REDIR_IP;
+        static const std::string ARG_HELP;
+        static const std::string ARG_RESET;
+        static const std::string ARG_OUT_FILE;
+        static const std::string ARG_WHITELIST;
+        static const std::string ARG_BLACKLIST;
+        static const std::string ARG_REDIRECT;
+        static const std::string ARG_HOSTS_SRC;
+        static const std::string ARG_REMOVE;
+        static const std::string ARG_ADD;
 
         static const std::string DEFAULT_IP;
 
@@ -28,13 +34,17 @@ class Config {
 
         std::vector<std::string> m_hostURLs;
 
-        bool allowRedirectionInHosts{false};
-        std::string redirectIP{DEFAULT_IP};
+        bool m_allowRedirectionInHosts{false};
+        bool m_isConfiguring{false};
 
-        std::string m_outFile{"/etc/hosts"};
+        std::string m_redirectIP{DEFAULT_IP};
+
+        std::string m_outFile;
 
         bool m_isHelp{false};
         bool m_resetDB{false};
+        bool m_configOnly{false};
+        bool m_removing{false};
 
         void parseArgs(int argc, char **argv);
         void prepareDB(SQLite::DB &db);
@@ -48,14 +58,26 @@ class Config {
         static const std::string& getAllowRedirectFlag();
         static const std::string& getOutFileFlag();
         static const std::string& getResetDBFlag();
+        static const std::string& getBlacklistFlag();
+        static const std::string& getWhitelistFlag();
+        static const std::string& getRedirectionFlag();
 
         const std::string& getRedirectIP() const;
         bool wantsHelp() const;
         bool wantsResetDB() const;
+        const std::string& outFile() const;
         void resetDB();
 
         void insertEntry(const std::string &host, const std::string &line);
         void saveToFile();
+        void addHostsSrc(const std::string &url);
+        void blacklist(const std::string &domain);
+        void whitelist(const std::string &domain);
+        void redirect(const std::string &domain, const std::string &ip);
+        void rmBlacklist(const std::string &domain);
+        void rmWhitelist(const std::string &domain);
+        void rmRedirect(const std::string &domain);
+        void rmHostsSrc(const std::string &domain);
 
         static const std::regex ipRegex;
         static const std::regex domainRegex;
