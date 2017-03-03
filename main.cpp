@@ -153,7 +153,7 @@ bool configure(Config &config, int argc, char *argv[]) {
                         else
                             config.redirect(domain, ip);
                     }
-                    else throw std::invalid_argument("Missing arguments [DOMAIN] [IP_ADDRESS] to flag " + ARG_REDIRECT);
+                    else throw std::invalid_argument("Missing one or more of arguments [DOMAIN] [IP_ADDRESS] to flag " + ARG_REDIRECT);
                 }
             }
             else if (arg == ARG_HOSTS_SRC) {
@@ -195,7 +195,13 @@ int main(int argc, char *argv[])
     Config config(":memory:");
     SQLite::DB::copy(configDB, config.m_db);
 
-    if (!configure(config, argc, argv)) return EXIT_FAILURE;
+    try {
+        if (!configure(config, argc, argv)) return EXIT_FAILURE;
+    }
+    catch(std::invalid_argument &e) {
+        std::cout << e.what() << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
 
     if (config.outFile() != "") {
         CURLcode result = curl_global_init(CURL_GLOBAL_DEFAULT);
