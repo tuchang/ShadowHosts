@@ -55,6 +55,123 @@ void printHelp(char *exeName) {
 bool configure(Config &config, int argc, char *argv[]) {
     try {
         config.prepare();
+        if (argc > 1) {
+            bool removing{false};
+            std::string arg;
+            for (int i = 1; i < argc; ++i) {
+                arg = argv[i];
+                if (arg == ARG_ALLOW_REDIR)
+                    config.allowHostsRedirection(true);
+                else if(arg == ARG_REDIR_IP) {
+                    if (i+1 < argc) {
+                        arg = argv[++i];
+                        if (std::regex_match(arg, Config::ipRegex))
+                            config.setRedirectIP(arg);
+                        else
+                            throw std::invalid_argument(arg + " is not a valid IP address!");
+                    }
+                    else throw std::invalid_argument("Missing argument [IP_ADDRESS] to flag " + ARG_REDIR_IP);
+                }
+                else if (arg == ARG_RESET) {
+                    config.resetDB();
+                }
+                else if (arg == ARG_REMOVE) {
+                    removing = true;
+                }
+                else if (arg == ARG_ADD) {
+                    removing = false;
+                }
+                else if (arg == ARG_BLACKLIST) {
+                    if (i+1 < argc) {
+                        arg = argv[++i];
+                        if (removing) {
+                            config.rmBlacklist(arg);
+                        }
+                        else {
+                            if (std::regex_match(arg, Config::domainRegex))
+                                config.blacklist(arg);
+                            else
+                                throw std::invalid_argument(arg + " is not a valid domain name!");
+                        }
+
+                    }
+                    else throw std::invalid_argument("Missing argument [DOMAIN] to flag " + ARG_BLACKLIST);
+                }
+                else if (arg == ARG_WHITELIST) {
+                    if (i+1 < argc) {
+                        arg = argv[++i];
+                        if (removing) {
+                            config.rmWhitelist(arg);
+                        }
+                        else {
+                            if (std::regex_match(arg, Config::domainRegex))
+                                config.whitelist(arg);
+                            else
+                                throw std::invalid_argument(arg + " is not a valid domain name!");
+                        }
+
+                    }
+                    else throw std::invalid_argument("Missing argument [DOMAIN] to flag " + ARG_WHITELIST);
+                }
+                else if (arg == ARG_REDIRECT) {
+                    if (removing) {
+                        if (i+1 < argc) {
+                            arg = argv[++i];
+                            config.rmRedirect(arg);
+                        }
+                        else throw std::invalid_argument("Missing argument [DOMAIN] to flags " + ARG_REMOVE + " " + ARG_REDIRECT);
+                    }
+                    else {
+                        if (i+2 < argc) {
+                            std::string domain, ip;
+                            domain = argv[++i];
+                            ip = argv[++i];
+                            if (!std::regex_match(domain, Config::domainRegex))
+                                throw std::invalid_argument(domain + " is not a valid domain name!");
+                            else if (!std::regex_match(ip, Config::ipRegex))
+                                throw std::invalid_argument(ip + " is not a valid IP address!");
+                            else
+                                config.redirect(domain, ip);
+                        }
+                        else throw std::invalid_argument("Missing one or more of arguments [DOMAIN] [IP_ADDRESS] to flag " + ARG_REDIRECT);
+                    }
+                }
+                else if (arg == ARG_HOSTS_SRC) {
+                    if (i+1 < argc) {
+                        arg = argv[++i];
+                        if (removing) {
+                            config.rmHostsSrc(arg);
+                        }
+                        else {
+                            if (std::regex_match(arg, Config::urlRegex))
+                                config.addHostsSrc(arg);
+                            else
+                                throw std::invalid_argument(arg + " is not a valid HTTPS URL!");
+                        }
+                    }
+                    else throw std::invalid_argument("Missing argument [URL] to flag " + ARG_HOSTS_SRC);
+                }
+                else if (arg == ARG_OUT_FILE) {
+                    if (i+1 < argc) {
+                        arg = argv[++i];
+                        config.outFile(arg);
+                        // TODO: Check if valid file, can write, etc?
+                    }
+                    else throw std::invalid_argument("Missing argument [FILE] to flag " + ARG_OUT_FILE);
+                }
+                else if (arg == ARG_HELP) {
+                    printHelp(argv[0]);
+                }
+            }
+        }
+
+        config.configure();
+        return true;
+    }
+    catch (SQLite::except::Readonly &e) {
+        std::cerr << "Could not modify the configuration database.\n"
+                  << "Do you have the necessary permissions?\n"
+                  << "Error: " << e.what() << std::endl;
     }
     catch (SQLite::except::CantOpen &e) {
         std::cerr << "Could not open configuration database file.\n"
@@ -74,119 +191,6 @@ bool configure(Config &config, int argc, char *argv[]) {
         std::cerr << e.what() << std::endl;
         return false;
     }
-
-    if (argc > 1) {
-        bool removing{false};
-        std::string arg;
-        for (int i = 1; i < argc; ++i) {
-            arg = argv[i];
-            if (arg == ARG_ALLOW_REDIR)
-                config.allowHostsRedirection(true);
-            else if(arg == ARG_REDIR_IP) {
-                if (i+1 < argc) {
-                    arg = argv[++i];
-                    if (std::regex_match(arg, Config::ipRegex))
-                        config.setRedirectIP(arg);
-                    else
-                        throw std::invalid_argument(arg + " is not a valid IP address!");
-                }
-                else throw std::invalid_argument("Missing argument [IP_ADDRESS] to flag " + ARG_REDIR_IP);
-            }
-            else if (arg == ARG_RESET) {
-                config.resetDB();
-            }
-            else if (arg == ARG_REMOVE) {
-                removing = true;
-            }
-            else if (arg == ARG_ADD) {
-                removing = false;
-            }
-            else if (arg == ARG_BLACKLIST) {
-                if (i+1 < argc) {
-                    arg = argv[++i];
-                    if (removing) {
-                        config.rmBlacklist(arg);
-                    }
-                    else {
-                        if (std::regex_match(arg, Config::domainRegex))
-                            config.blacklist(arg);
-                        else
-                            throw std::invalid_argument(arg + " is not a valid domain name!");
-                    }
-
-                }
-                else throw std::invalid_argument("Missing argument [DOMAIN] to flag " + ARG_BLACKLIST);
-            }
-            else if (arg == ARG_WHITELIST) {
-                if (i+1 < argc) {
-                    arg = argv[++i];
-                    if (removing) {
-                        config.rmWhitelist(arg);
-                    }
-                    else {
-                        if (std::regex_match(arg, Config::domainRegex))
-                            config.whitelist(arg);
-                        else
-                            throw std::invalid_argument(arg + " is not a valid domain name!");
-                    }
-
-                }
-                else throw std::invalid_argument("Missing argument [DOMAIN] to flag " + ARG_WHITELIST);
-            }
-            else if (arg == ARG_REDIRECT) {
-                if (removing) {
-                    if (i+1 < argc) {
-                        arg = argv[++i];
-                        config.rmRedirect(arg);
-                    }
-                    else throw std::invalid_argument("Missing argument [DOMAIN] to flags " + ARG_REMOVE + " " + ARG_REDIRECT);
-                }
-                else {
-                    if (i+2 < argc) {
-                        std::string domain, ip;
-                        domain = argv[++i];
-                        ip = argv[++i];
-                        if (!std::regex_match(domain, Config::domainRegex))
-                            throw std::invalid_argument(domain + " is not a valid domain name!");
-                        else if (!std::regex_match(ip, Config::ipRegex))
-                            throw std::invalid_argument(ip + " is not a valid IP address!");
-                        else
-                            config.redirect(domain, ip);
-                    }
-                    else throw std::invalid_argument("Missing one or more of arguments [DOMAIN] [IP_ADDRESS] to flag " + ARG_REDIRECT);
-                }
-            }
-            else if (arg == ARG_HOSTS_SRC) {
-                if (i+1 < argc) {
-                    arg = argv[++i];
-                    if (removing) {
-                        config.rmHostsSrc(arg);
-                    }
-                    else {
-                        if (std::regex_match(arg, Config::urlRegex))
-                            config.addHostsSrc(arg);
-                        else
-                            throw std::invalid_argument(arg + " is not a valid HTTPS URL!");
-                    }
-                }
-                else throw std::invalid_argument("Missing argument [URL] to flag " + ARG_HOSTS_SRC);
-            }
-            else if (arg == ARG_OUT_FILE) {
-                if (i+1 < argc) {
-                    arg = argv[++i];
-                    config.outFile(arg);
-                    // TODO: Check if valid file, can write, etc?
-                }
-                else throw std::invalid_argument("Missing argument [FILE] to flag " + ARG_OUT_FILE);
-            }
-            else if (arg == ARG_HELP) {
-                printHelp(argv[0]);
-            }
-        }
-    }
-
-    config.configure();
-    return true;
 }
 
 int main(int argc, char *argv[])
@@ -285,7 +289,14 @@ int main(int argc, char *argv[])
         curl_global_cleanup();
     }
 
-    SQLite::DB::copy(config.m_db, configDB);
+    try {
+        SQLite::DB::copy(config.m_db, configDB);
+    }
+    catch (SQLite::except::Readonly &e) {
+        std::cerr << "Could not modify the configuration database.\n"
+                  << "Do you have the necessary permissions?\n"
+                  << "Error: " << e.what() << std::endl;
+    }
 
     if (config.outFile() != "") {
         try {
