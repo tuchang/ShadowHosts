@@ -16,6 +16,8 @@ static const std::string ARG_REDIR_IP{"--redirect-ip"};
 static const std::string ARG_OUT_FILE{"--out"};
 static const std::string ARG_HELP{"--help"};
 static const std::string ARG_RESET{"--reset"};
+static const std::string ARG_ENABLE{"--enable"};
+static const std::string ARG_DISABLE{"--disable"};
 static const std::string ARG_WHITELIST{"--whitelist"};
 static const std::string ARG_BLACKLIST{"--blacklist"};
 static const std::string ARG_REDIRECT{"--redirect"};
@@ -36,6 +38,8 @@ void printHelp(char *exeName) {
                  ARG_RESET << " Reset the configuration database to default.\n" <<
                  ARG_ADD << " [OPTION] [ARG] [...] Add the following entries to the configuration database (default).\n" <<
                  ARG_REMOVE << " [OPTION] [ARG] [...] Remove the following entries from the configuration database.\n" <<
+                 ARG_ENABLE << " [OPTION] [INDEX] Enable the following item by index number, if disabled.\n" <<
+                 ARG_DISABLE << " [OPTION] [INDEX] Disable the following item by index number, if enabled.\n" <<
                  ARG_HELP << " Display this help and exit.\n" <<
                  "\n[OPTIONS]\n" <<
                  "Each of the following options specify behavior that is saved in the configuration database.\n" <<
@@ -80,6 +84,28 @@ bool configure(Config &config, int argc, char *argv[]) {
                 }
                 else if (arg == ARG_ADD) {
                     removing = false;
+                }
+                else if (arg == ARG_ENABLE || arg == ARG_DISABLE) {
+                    if (i+2 < argc) {
+                        std::string option = argv[++i];
+                        std::string optionArg = argv[++i];
+
+                        if (option == ARG_HOSTS_SRC) {
+                            int index;
+                            try {
+                                index = std::stoi(optionArg);
+                            }
+                            catch (std::invalid_argument &e) {
+                                throw std::invalid_argument("Could not convert \"" + optionArg + "\" to an index number");
+                            }
+                            config.toggleHostsSource(index, arg == ARG_ENABLE);
+                        }
+                        else if (option == ARG_BLACKLIST) config.toggleBlacklist(optionArg, arg == ARG_ENABLE);
+                        else if (option == ARG_WHITELIST) config.toggleWhitelist(optionArg, arg == ARG_ENABLE);
+                        else if (option == ARG_REDIRECT) config.toggleRedirect(optionArg, arg == ARG_ENABLE);
+
+                    }
+                    else throw std::invalid_argument("Missing one or more of arguments [OPTION] [INDEX] to flag " + arg);
                 }
                 else if (arg == ARG_BLACKLIST) {
                     if (i+1 < argc) {

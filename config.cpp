@@ -63,9 +63,10 @@ void Config::prepare() {
     m_db.execute(statement);
     statement = "CREATE TABLE IF NOT EXISTS " + ENTRIES_TABLE + "("
                    "source INT NOT NULL, "
-                   "domain TEXT NOT NULL PRIMARY KEY UNIQUE CHECK(domain IS NOT 'localhost'), "
+                   "domain TEXT NOT NULL CHECK(domain IS NOT 'localhost'), "
                    "ip TEXT NOT NULL, "
                    "enabled INT NOT NULL DEFAULT 1 CHECK(enabled IN(0, 1)), "
+                   "PRIMARY KEY(source, domain), "
                    "FOREIGN KEY(source) REFERENCES " + HOSTS_TABLE + "(id)"
                    ")";
     m_db.execute(statement);
@@ -98,7 +99,8 @@ void Config::saveToFile() {
     std::string ip, domain;
     HostsFile hosts;
 
-    SQLite::Stmt save = m_db.prepare("SELECT ip, domain FROM " + ENTRIES_TABLE + " WHERE enabled = 1");
+    SQLite::Stmt save = m_db.prepare("SELECT DISTINCT e.ip, e.domain FROM " + ENTRIES_TABLE + " AS e JOIN " + HOSTS_TABLE +
+                                     " AS h ON e.source = h.id WHERE e.enabled = 1 AND h.enabled = 1");
     save.exec([this, &hosts, &ip, &domain](SQLite::Row &row) mutable -> void {
         ip = row.getString(0);
         domain = row.getString(1);
@@ -147,18 +149,21 @@ void Config::resetDB() {
     m_db.execute("DELETE FROM " + REDIRECT_TABLE);
     m_db.execute("DELETE FROM " + ENTRIES_TABLE);
 
-    SQLite::Stmt insert = m_db.prepare("INSERT INTO " + HOSTS_TABLE + "(url) VALUES(:url)");
+    SQLite::Stmt insert = m_db.prepare("INSERT INTO " + HOSTS_TABLE + "(id, url) VALUES(:id, :url)");
     std::string host = "https://adaway.org/hosts.txt";
+    insert.bindValue(":id", 1);
     insert.bindValue(":url", host);
     insert.exec();
 
     insert.clearBindings();
     host = "https://hosts-file.net/ad_servers.txt";
+    insert.bindValue(":id", 2);
     insert.bindValue(":url", host);
     insert.exec();
 
     insert.clearBindings();
     host = "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext";
+    insert.bindValue(":id", 3);
     insert.bindValue(":url", host);
     insert.exec();
 }
@@ -308,4 +313,32 @@ void Config::insertEntry(const std::string &host, const std::string &line) {
                 throw e;
         }
     }
+}
+
+void Config::toggleBlacklist(const std::string &domain, bool enable) {
+    SQLite::Stmt toggle = m_db.prepare("UPDATE " + BLACKLIST_TABLE + " SET enabled = :isset WHERE domain = :id");
+    toggle.bindValue(":isset", enable);
+    toggle.bindValue(":id", domain);
+    toggle.exec();
+}
+
+void Config::toggleWhitelist(const std::string &domain, bool enable) {
+    SQLite::Stmt toggle = m_db.prepare("UPDATE " + WHITELIST_TABLE + " SET enabled = :isset WHERE domain = :id");
+    toggle.bindValue(":isset", enable);
+    toggle.bindValue(":id", domain);
+    toggle.exec();
+}
+
+void Config::toggleRedirect(const std::string &domain, bool enable) {
+    SQLite::Stmt toggle = m_db.prepare("UPDATE " + REDIRECT_TABLE + " SET enabled = :isset WHERE domain = :id");
+    toggle.bindValue(":isset", enable);
+    toggle.bindValue(":id", domain);
+    toggle.exec();
+}
+
+void Config::toggleHostsSource(int index, bool enable) {
+    SQLite::Stmt toggle = m_db.prepare("UPDATE " + HOSTS_TABLE + " SET enabled = :isset WHERE id = :id");
+    toggle.bindValue(":isset", enable);
+    toggle.bindValue(":id", index);
+    toggle.exec();
 }

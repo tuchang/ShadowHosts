@@ -51,6 +51,10 @@ class Config {
         void rmWhitelist(const std::string &domain);
         void rmRedirect(const std::string &domain);
         void rmHostsSrc(const std::string &domain);
+        void toggleBlacklist(const std::string &domain, bool enable);
+        void toggleWhitelist(const std::string &domain, bool enable);
+        void toggleRedirect(const std::string &domain, bool enable);
+        void toggleHostsSource(int index, bool enable);
 
         void allowHostsRedirection(bool set);
         bool allowHostsRedirection() const;
